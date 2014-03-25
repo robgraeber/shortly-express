@@ -14,7 +14,9 @@ h1 {
   font-style: italic;
   margin-bottom: 10px;
 }
-
+#logoutBtn{
+  float:right;
+}
 .navigation {
   width: 100%;
   height: 40px;

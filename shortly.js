@@ -1,4 +1,5 @@
 
+var _ = require("underscore");
 var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
@@ -10,6 +11,7 @@ var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 var LinkUser = require('./app/models/link_user');
+var LinksUsers = require('./app/collections/links_users');
 var app = express();
 
 app.configure(function() {
@@ -27,7 +29,13 @@ app.get('/', function(req, res) {
   }
   res.render('index');
 });
-
+app.get('/logout', function(req, res) {
+  if(!checkUser(req, res)){
+    return;
+  }
+  util.removeSession(req.cookies.sessionId)
+  res.redirect('/login');
+});
 app.get('/create', function(req, res) {
   if(!checkUser(req, res)){
     return;
@@ -40,9 +48,12 @@ app.get('/links', function(req, res) {
     return;
   }
   var session = util.getSession(req.cookies.sessionId);
-  new User({id: session.userId}).fetch().then(function(user) {
-    if(user){
-      user.links().fetch().then(function(links){
+  LinksUsers.resetQuery().query().where({user_id: session.userId}).then(function(linksUsers) {
+    if(linksUsers){
+      console.log("Shitty linksUsers:", linksUsers);
+      var linkIds = _.pluck(linksUsers, "link_id");
+      console.log("Shitty linkIds:", linkIds);
+      Links.resetQuery().query().whereIn('id', linkIds).then(function(links){
         console.log("Shitty links:", links);
         res.send(200, links);
       });
@@ -84,7 +95,6 @@ app.post('/links', function(req, res) {
           url: uri,
           title: title,
           base_url: req.headers.origin,
-          user_id: session.userId //git rid
         });
         link.save().then(function(newLink) {
           new LinkUser({

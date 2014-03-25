@@ -7,7 +7,7 @@ var User = db.Model.extend({
   tableName: 'users',
   hasTimestamps: true,
   links: function() {
-    return this.hasMany(Link).through(LinkUser, "user_id", "link_id");
+    return this.hasMany(Link).through(LinkUser, "id", "link_id");
   }
 });
 

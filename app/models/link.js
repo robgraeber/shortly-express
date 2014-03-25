@@ -13,7 +13,8 @@ var Link = db.Model.extend({
     return this.hasMany(Click);
   },
   users: function () {
-    return this.belongsToMany(User, "urls_users", "link_id", "user_id");
+    // only useful if we are trying to grab all users with a particular link
+    return this.hasMany(User).through(LinkUser, "id", "user_id");
   },
   initialize: function(){
     this.on('creating', function(model, attrs, options){
