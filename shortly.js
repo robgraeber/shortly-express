@@ -50,11 +50,11 @@ app.get('/links', function(req, res) {
   var session = util.getSession(req.cookies.sessionId);
   LinksUsers.resetQuery().query().where({user_id: session.userId}).then(function(linksUsers) {
     if(linksUsers){
-      console.log("Shitty linksUsers:", linksUsers);
+      // console.log("Shitty linksUsers:", linksUsers);
       var linkIds = _.pluck(linksUsers, "link_id");
-      console.log("Shitty linkIds:", linkIds);
+      // console.log("Shitty linkIds:", linkIds);
       Links.resetQuery().query().whereIn('id', linkIds).then(function(links){
-        console.log("Shitty links:", links);
+        // console.log("Shitty links:", links);
         res.send(200, links);
       });
     }else{
