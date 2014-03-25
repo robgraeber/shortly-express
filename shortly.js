@@ -1,3 +1,4 @@
+
 var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
@@ -8,40 +9,56 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
-
+var LinkUser = require('./app/models/link_user');
 var app = express();
 
 app.configure(function() {
   app.set('views', __dirname + '/views');
   app.set('view engine', 'ejs');
   app.use(partials());
-  app.use(express.bodyParser())
+  app.use(express.bodyParser());
+  app.use(express.cookieParser());
   app.use(express.static(__dirname + '/public'));
 });
 
 app.get('/', function(req, res) {
-  res.render('index');
+  if(checkUser(req, res)){
+    res.render('index');
+  }
 });
 
 app.get('/create', function(req, res) {
-  res.render('index');
+  if(checkUser(req, res)){
+    res.render('index');
+  }
 });
 
 app.get('/links', function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
-  })
+  if(checkUser(req, res)){
+    var session = util.getSession(req.cookies.sessionId);
+    new User({id: session.userId}).fetch().then(function(user) {
+      if(user){
+        console.log("User_Links:", user.links());
+        res.send(200, user.links());
+      }else{
+        res.send(404);
+      }
+    });
+  }
 });
 
 app.post('/links', function(req, res) {
+  if(!checkUser(req, res)){
+    return;
+  }
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
     return res.send(404);
   }
-
-  new Link({ url: uri }).fetch().then(function(found) {
+  var session = util.getSession(req.cookies.sessionId);
+  new Link({ url: uri}).fetch().then(function(found) {
     if (found) {
       res.send(200, found.attributes);
     } else {
@@ -54,12 +71,18 @@ app.post('/links', function(req, res) {
         var link = new Link({
           url: uri,
           title: title,
-          base_url: req.headers.origin
+          base_url: req.headers.origin,
+          user_id: session.userId //git rid
         });
-
         link.save().then(function(newLink) {
-          Links.add(newLink);
-          res.send(200, newLink);
+          new LinkUser({
+            user_id: session.userId,
+            link_id: newLink.get("id")
+          }).save().then(function(linkUser){
+            console.log("LINK USER:", linkUser);
+            Links.add(newLink);
+            res.send(200, newLink);
+          });
         });
       });
     }
@@ -69,8 +92,64 @@ app.post('/links', function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/signup', function(req, res) {
+  res.render('signup', {locals: {}});
+});
 
+app.get('/login', function(req, res) {
+  res.render('login', {locals: {}});
+});
 
+app.post('/signup', function(req, res) {
+  // console.log("PARAMS", req.body);
+  if (req.body.username && req.body.password) {
+    req.body.username = req.body.username.toUpperCase();
+    new User({'username': req.body.username})
+      .fetch()
+      .then(function(user) { // if nothing found in database, returns null (not undefined)
+        if (!user) {
+          new User({'username': req.body.username, 'password': req.body.password})
+          .save()
+          .then(function (user){
+            console.log("User created successfully!");
+            util.createSession(user.get("id"),res);
+            res.redirect('/');
+          });
+        } else {
+          res.render('signup', {locals: {error: "User already exists!!"}});
+        }
+      });
+  }
+});
+
+app.post('/login', function(req, res) {
+  if (req.body.username && req.body.password) {
+    req.body.username = req.body.username.toUpperCase();
+  new User({'username': req.body.username, 'password': req.body.password})
+    .fetch()
+    .then(function(user) { // if nothing found in database, returns null (not undefined)
+      if (user) {
+        console.log(user.links());
+        util.createSession(user.get("id"), res);
+        res.redirect('/');
+      }else{
+        res.render('login', {locals: {error: "User or password not found!!"}});
+      }
+    });
+  }
+});
+
+var checkUser = function (request, response) {
+  // valid cookie and valid session
+  if (request.cookies.sessionId && util.getSession(request.cookies.sessionId)) {
+    console.log("User has a valid cookie and session id.", request.cookies.sessionId);
+    return true;
+  } else {
+    // redirect to login page
+    response.redirect('/login');
+    return false;
+  }
+};
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
