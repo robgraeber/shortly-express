@@ -22,29 +22,34 @@ app.configure(function() {
 });
 
 app.get('/', function(req, res) {
-  if(checkUser(req, res)){
-    res.render('index');
+  if(!checkUser(req, res)){
+    return;
   }
+  res.render('index');
 });
 
 app.get('/create', function(req, res) {
-  if(checkUser(req, res)){
-    res.render('index');
+  if(!checkUser(req, res)){
+    return;
   }
+  res.render('index');
 });
 
 app.get('/links', function(req, res) {
-  if(checkUser(req, res)){
-    var session = util.getSession(req.cookies.sessionId);
-    new User({id: session.userId}).fetch().then(function(user) {
-      if(user){
-        console.log("User_Links:", user.links());
-        res.send(200, user.links());
-      }else{
-        res.send(404);
-      }
-    });
+  if(!checkUser(req, res)){
+    return;
   }
+  var session = util.getSession(req.cookies.sessionId);
+  new User({id: session.userId}).fetch().then(function(user) {
+    if(user){
+      user.links().fetch().then(function(links){
+        console.log("Shitty links:", links);
+        res.send(200, links);
+      });
+    }else{
+      res.send(404);
+    }
+  });
 });
 
 app.post('/links', function(req, res) {
@@ -58,9 +63,16 @@ app.post('/links', function(req, res) {
     return res.send(404);
   }
   var session = util.getSession(req.cookies.sessionId);
-  new Link({ url: uri}).fetch().then(function(found) {
-    if (found) {
-      res.send(200, found.attributes);
+  new Link({ url: uri}).fetch().then(function(link) {
+    if (link) {
+      console.log("LINK FOUND");
+      new LinkUser({
+          user_id: session.userId,
+          link_id: link.get("id")
+        }).save().then(function(linkUser){
+          console.log("LINK USER CREATED:", linkUser);
+          res.send(200, link.attributes);
+        });
     } else {
       util.getUrlTitle(uri, function(err, title) {
         if (err) {
@@ -142,7 +154,7 @@ app.post('/login', function(req, res) {
 var checkUser = function (request, response) {
   // valid cookie and valid session
   if (request.cookies.sessionId && util.getSession(request.cookies.sessionId)) {
-    console.log("User has a valid cookie and session id.", request.cookies.sessionId);
+    console.log("User has a valid cookie and session id.", request.cookies.sessionId, util.getSession(request.cookies.sessionId));
     return true;
   } else {
     // redirect to login page

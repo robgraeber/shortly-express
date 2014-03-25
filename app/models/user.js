@@ -2,12 +2,12 @@ var db = require('../config');
 var bcrypt = require('bcrypt-nodejs');
 var Promise = require('bluebird');
 var Link = require('./link');
-
+var LinkUser = require('./link_user');
 var User = db.Model.extend({
   tableName: 'users',
   hasTimestamps: true,
   links: function() {
-    return this.belongsToMany(Link, "urls_users", "user_id", "link_id" );
+    return this.hasMany(Link).through(LinkUser, "user_id", "link_id");
   }
 });
 
