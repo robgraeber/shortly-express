@@ -48,19 +48,21 @@ app.get('/links', function(req, res) {
     return;
   }
   var session = util.getSession(req.cookies.sessionId);
-  LinksUsers.resetQuery().query().where({user_id: session.userId}).then(function(linksUsers) {
-    if(linksUsers){
-      // console.log("Shitty linksUsers:", linksUsers);
-      var linkIds = _.pluck(linksUsers, "link_id");
-      // console.log("Shitty linkIds:", linkIds);
-      Links.resetQuery().query().whereIn('id', linkIds).then(function(links){
-        // console.log("Shitty links:", links);
-        res.send(200, links);
-      });
-    }else{
-      res.send(404);
-    }
-  });
+
+  new User({id: session.userId}).fetch({withRelated: ['links']})
+  .then(function(model){
+    res.send(200, model.related("links"));
+  })
+  // LinksUsers.resetQuery().query().where({user_id: session.userId}).then(function(linksUsers) {
+  //   if(linksUsers){
+  //     var linkIds = _.pluck(linksUsers, "link_id");
+  //     Links.resetQuery().query().whereIn('id', linkIds).then(function(links){
+  //       res.send(200, links);
+  //     });
+  //   }else{
+  //     res.send(404);
+  //   }
+  // });
 });
 
 app.post('/links', function(req, res) {
@@ -151,7 +153,6 @@ app.post('/login', function(req, res) {
     .fetch()
     .then(function(user) { // if nothing found in database, returns null (not undefined)
       if (user) {
-        console.log(user.links());
         util.createSession(user.get("id"), res);
         res.redirect('/');
       }else{
